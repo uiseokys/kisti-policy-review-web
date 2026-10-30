@@ -1,0 +1,2 @@
+[functions.team-access]
+verify_jwt = false
