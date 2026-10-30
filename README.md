@@ -2,6 +2,8 @@
 
 3명의 평가자가 각자 판단을 기록하고, 관리자는 답변을 보지 않은 채 진행률을 확인하는 React + TypeScript + Vite 앱입니다. Supabase Auth·PostgreSQL·Realtime 연결 코드와 GitHub Pages 배포 워크플로를 포함합니다.
 
+**온라인 주소:** https://uiseokys.github.io/kisti-policy-review-web/ · [실제 배포·Supabase 검증 결과](docs/DEPLOYED_STATUS.md)
+
 현재는 **합성 데이터 파일럿**입니다. Supabase 프로젝트가 없어도 로컬 연습이 동작합니다. 실제 회의록과 평가표를 가져오면 이 기기의 IndexedDB에만 보관하며, 원문과 파생 라벨의 온라인 동기화·최종 제출은 차단합니다. 대회 데이터 저장 허용 범위가 확인되기 전에는 이 제한을 해제하지 마세요.
 
 ## 팀원 접속 방식

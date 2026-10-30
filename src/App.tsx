@@ -6,7 +6,7 @@ import {DemoBackend} from './demo';
 import {syntheticDocument} from './synthetic';
 import {documentItems,parseReviewCsv,selectAssignmentDocument,type ReviewDocument} from './csv';
 import {SOURCE_GROUPS,assignmentTitle,roleLabel,teamAllocation} from './allocation';
-import {TeamProgress} from './TeamProgress';
+import {TeamProgress,plannedTeamTotal} from './TeamProgress';
 import {ReviewExports} from './TeamExports';
 import {initialReviewMode} from './accessMode';
 import {TeamAccess} from './TeamAccess';
@@ -65,7 +65,7 @@ export default function App(){
 }
 
 function Workspace({identity,backend,beforeNavigate,registerFlush}:{identity:Identity;backend:ReviewBackend;beforeNavigate:()=>Promise<void>;registerFlush:RegisterFlush}){
- const [assignments,setAssignments]=useState<Assignment[]>([]),[progress,setProgress]=useState<Progress[]>([]),[selected,setSelected]=useState(''),[mode,setMode]=useState<'official'|'balanced'>('official');
+ const [assignments,setAssignments]=useState<Assignment[]>([]),[progress,setProgress]=useState<Progress[]>([]),[selected,setSelected]=useState(''),[mode,setMode]=useState<'official'|'balanced'>(identity.mode==='supabase'?'balanced':'official');
  const modeChosen=useRef(false);
  const [notice,setNotice]=useState(''),[lastCheck,setLastCheck]=useState<string|null>(null),[queryError,setQueryError]=useState('');
  const reload=useCallback(async()=>{try{const p=await backend.progress();setProgress(p);const own=identity.role==='reviewer'?await backend.assignments():p;if(identity.role==='reviewer')setAssignments(own as Assignment[]);if(!modeChosen.current&&own.length){setMode(initialReviewMode(own));modeChosen.current=true;}setLastCheck(new Date().toISOString());setQueryError('');}catch{setQueryError('서버 상태를 확인하지 못했습니다. 자동으로 다시 시도합니다.');}},[backend,identity.role]);
@@ -128,6 +128,6 @@ function ReviewEditor({identity,backend,assignment,progress,refresh,notice,regis
 }
 
 function AdminDashboard({backend,mode,progress,lastCheck,notice}:{backend:ReviewBackend;mode:'official'|'balanced';progress:Progress[];lastCheck:string|null;notice:(v:string)=>void}){
- const total=progress.reduce((n,p)=>n+p.total,0),complete=progress.reduce((n,p)=>n+p.complete,0),inProgress=progress.reduce((n,p)=>n+p.inProgress,0);
+ const total=mode==='balanced'?plannedTeamTotal(progress):progress.reduce((n,p)=>n+p.total,0),complete=progress.reduce((n,p)=>n+p.complete,0),inProgress=progress.reduce((n,p)=>n+p.inProgress,0);
  return <><div className="workspace-heading"><div><div className="eyebrow">ADMIN · PROGRESS ONLY</div><h1>독립적으로 평가하고,<br/>진행은 한눈에.</h1><p className="muted">개별 답변과 방법별 대응표는 블라인드 종료 전 공개하지 않습니다.</p></div><div className="admin-updated"><span className="live-dot"/>자동 갱신<small>마지막 확인 {time(lastCheck)}</small></div></div><div className="metrics-row"><div><span>전체 배정</span><strong>{total}<small>항목</small></strong></div><div><span>서버 저장 완료</span><strong>{complete}<small>항목</small></strong></div><div><span>작성 중</span><strong>{inProgress}<small>항목</small></strong></div><div><span>완료율</span><strong>{total?(complete/total*100).toFixed(1):'0.0'}<small>%</small></strong></div></div>{mode==='balanced'&&<TeamProgress progress={progress}/>}<div className="dashboard-section-heading"><h2>{mode==='official'?'공식 작업군별 현황':'평가 유형별 3인 분담 현황'}</h2><span className="muted small">완료 수는 서버에 확정된 필수 라벨 기준</span></div><div className="progress-cards">{progress.map(p=><article key={p.assignmentId} className="progress-card"><div className="progress-card-top"><span className="assignment-code">{roleLabel(p.roleCode)}</span><span className={'pill '+(p.submittedAt?'green':'neutral')}>{p.submittedAt?'제출·잠금':'평가 진행'}</span></div><h3>{assignmentTitle(p.roleCode)}</h3><div className="card-completion"><strong>{p.complete}</strong><span>/ {p.total}</span><b>{p.percent.toFixed(1)}%</b></div><div className="progress-track"><i style={{width:`${p.percent}%`}}/></div><div className="card-counts"><span>작성 중 <b>{p.inProgress}</b></span><span>미작성 <b>{p.untouched}</b></span></div><div className="card-detail"><span>마지막 저장</span><b>{time(p.lastSavedAt)}</b></div><div className="card-detail"><span>동기화 상태</span><b>{p.lastSeenAt&&Date.now()-Date.parse(p.lastSeenAt)>90000?'최근 상태 미확인':({saved:'마지막 저장 확인',pending:'미동기화 보고됨',conflict:'충돌 보고됨',error:'저장 오류 보고됨',idle:'저장 대기'}[p.lastSyncState]||p.lastSyncState)}</b></div></article>)}</div><div className="admin-privacy"><span>⌑</span><div><strong>진행 정보만 공개합니다.</strong><p>관리자 화면은 완료 수와 동기화 상태만 구독합니다. 오프라인 기기의 미전송 편집은 서버가 아직 알 수 없으므로, 마지막 접속 이후의 상태를 완료로 추정하지 않습니다.</p></div></div><ReviewExports backend={backend} mode={mode} progress={progress} notice={notice}/></>;
 }

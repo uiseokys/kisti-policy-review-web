@@ -16,6 +16,25 @@ export interface SessionTokens {
   refresh_token: string;
 }
 
+/** Supabase injects modern key dictionaries; older local stacks may inject legacy keys. */
+export function resolveServerKeys(env: Record<string, string | undefined>): { publicKey: string; adminKey: string } | null {
+  const defaultKey = (raw: string | undefined, prefix: string): string | null => {
+    if (!raw) return null;
+    try {
+      const parsed: unknown = JSON.parse(raw);
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+      const key = (parsed as Record<string, unknown>).default;
+      return typeof key === 'string' && key.startsWith(prefix) && key.length > prefix.length && key.trim() === key
+        ? key : null;
+    } catch { return null; }
+  };
+  const legacyKey = (value: string | undefined): string | null =>
+    value && value.trim() === value ? value : null;
+  const publicKey = defaultKey(env.SUPABASE_PUBLISHABLE_KEYS, 'sb_publishable_') ?? legacyKey(env.SUPABASE_ANON_KEY);
+  const adminKey = defaultKey(env.SUPABASE_SECRET_KEYS, 'sb_secret_') ?? legacyKey(env.SUPABASE_SERVICE_ROLE_KEY);
+  return publicKey && adminKey ? { publicKey, adminKey } : null;
+}
+
 /** All privileged operations live in the Edge entry point's service-role client. */
 export interface TeamAccessServices {
   getActiveProject(): Promise<string | null>;

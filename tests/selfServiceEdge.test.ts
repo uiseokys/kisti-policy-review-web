@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createTeamAccessHandler, type TeamAccessServices } from '../supabase/functions/team-access/handler';
+import { createTeamAccessHandler, resolveServerKeys, type TeamAccessServices } from '../supabase/functions/team-access/handler';
 
 const origin = 'https://uiseokys.github.io';
 const invite = 'a'.repeat(64);
@@ -33,6 +33,32 @@ function fixture() {
 }
 
 describe('team-access edge handler', () => {
+  it('prefers the default modern publishable and secret keys over legacy values', () => {
+    expect(resolveServerKeys({
+      SUPABASE_PUBLISHABLE_KEYS: JSON.stringify({ default: 'sb_publishable_MODERN', alternate: 'sb_publishable_OTHER' }),
+      SUPABASE_SECRET_KEYS: JSON.stringify({ default: 'sb_secret_MODERN' }),
+      SUPABASE_ANON_KEY: 'legacy-public', SUPABASE_SERVICE_ROLE_KEY: 'legacy-admin'
+    })).toEqual({ publicKey: 'sb_publishable_MODERN', adminKey: 'sb_secret_MODERN' });
+  });
+
+  it('falls back per key when modern dictionaries are missing, malformed, or have an invalid default', () => {
+    expect(resolveServerKeys({
+      SUPABASE_PUBLISHABLE_KEYS: '{invalid json',
+      SUPABASE_SECRET_KEYS: JSON.stringify({ default: 'sb_publishable_WRONG_ROLE' }),
+      SUPABASE_ANON_KEY: 'legacy-public', SUPABASE_SERVICE_ROLE_KEY: 'legacy-admin'
+    })).toEqual({ publicKey: 'legacy-public', adminKey: 'legacy-admin' });
+    expect(resolveServerKeys({
+      SUPABASE_PUBLISHABLE_KEYS: JSON.stringify({ default: 'sb_publishable_MODERN' }),
+      SUPABASE_SERVICE_ROLE_KEY: 'legacy-admin'
+    })).toEqual({ publicKey: 'sb_publishable_MODERN', adminKey: 'legacy-admin' });
+  });
+
+  it('fails closed when either modern and legacy key pair cannot provide both roles', () => {
+    expect(resolveServerKeys({ SUPABASE_PUBLISHABLE_KEYS: '{}', SUPABASE_SECRET_KEYS: '[]' })).toBeNull();
+    expect(resolveServerKeys({ SUPABASE_PUBLISHABLE_KEYS: JSON.stringify({ default: 'sb_publishable_MODERN' }) })).toBeNull();
+    expect(resolveServerKeys({ SUPABASE_SECRET_KEYS: JSON.stringify({ default: 'sb_secret_MODERN' }) })).toBeNull();
+  });
+
   it('denies a missing or foreign Origin before touching privileged services', async () => {
     const { services, handler, request } = fixture();
     expect((await request({ action: 'login', seat: 'member1', name: '민지', password: 'password123' }, 'https://evil.example')).status).toBe(403);

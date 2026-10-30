@@ -1,16 +1,20 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
-import { createTeamAccessHandler, type Action, type InviteRow, type Seat, type SessionTokens, type TeamAccessServices } from './handler.ts';
+import { createTeamAccessHandler, resolveServerKeys, type Action, type InviteRow, type Seat, type SessionTokens, type TeamAccessServices } from './handler.ts';
 
 const url = Deno.env.get('SUPABASE_URL');
-const anonKey = Deno.env.get('SUPABASE_ANON_KEY');
-const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+const keys = resolveServerKeys({
+  SUPABASE_PUBLISHABLE_KEYS: Deno.env.get('SUPABASE_PUBLISHABLE_KEYS'),
+  SUPABASE_SECRET_KEYS: Deno.env.get('SUPABASE_SECRET_KEYS'),
+  SUPABASE_ANON_KEY: Deno.env.get('SUPABASE_ANON_KEY'),
+  SUPABASE_SERVICE_ROLE_KEY: Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+});
 const appOrigin = Deno.env.get('KISTI_APP_ORIGIN');
 
 function makeServices(): TeamAccessServices | null {
-  if (!url || !anonKey || !serviceRoleKey) return null;
+  if (!url || !keys) return null;
   const clientOptions = { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } };
-  const service = createClient(url, serviceRoleKey, clientOptions);
-  const publicAuth = createClient(url, anonKey, clientOptions);
+  const service = createClient(url, keys.adminKey, clientOptions);
+  const publicAuth = createClient(url, keys.publicKey, clientOptions);
   const checked = <T extends { data: unknown; error: { message: string } | null }>(result: T): T['data'] => {
     if (result.error) throw new Error('Service operation failed');
     return result.data;
